@@ -295,3 +295,105 @@ class Decoder(nn.Module):
 
         return self.norm(x)  # Output shape will be (batch_size, seq_len, d_model)
 
+class ProjectionLayer(nn.Model):
+
+    def __init__(self, d_model: int, vocab_size: int):
+        super().__init__()
+        self.linear = nn.Linear(d_model, vocab_size)
+
+    def forward(self, x):
+        # x.shape = (batch_size, seq_len, d_model)
+        # Output shape will be (batch_size, seq_len, vocab_size)
+        return torch.log_softmax(self.linear(x))  # Project to vocabulary size
+    
+class Transformer(nn.Module):
+    def __init__(self, src_embedding: InputEmbedding, trg_embedding: InputEmbedding, src_positional_embedding: PositionalEmbedding, trg_positional_embedding: PositionalEmbedding, encoder: Encoder, decoder: Decoder, projection_layer: ProjectionLayer):
+        super().__init__()
+        self.src_embedding = src_embedding
+        self.src_positional_embedding = src_positional_embedding
+        self.trg_embedding = trg_embedding
+        self.trg_positional_embedding = trg_positional_embedding
+        self.encoder = encoder
+        self.decoder = decoder
+        self.projection_layer = projection_layer
+
+    def encode(self, src, src_mask=None):
+        # src.shape = (batch_size, src_seq_len)
+        # Apply input embedding and positional embedding
+        src = self.src_embedding(src)
+        src = self.src_positional_embedding(src)
+        return self.encoder(src, src_mask)
+    
+    def decode(self, trg, encoder_output, src_mask=None, tgt_mask=None):
+        # trg.shape = (batch_size, trg_seq_len)
+        # Apply input embedding and positional embedding
+        trg = self.trg_embedding(trg)
+        trg = self.trg_positional_embedding(trg)
+        return self.decoder(trg, encoder_output, src_mask, tgt_mask)
+    
+    def project(self, x):
+        # x.shape = (batch_size, seq_len, d_model)
+        return self.projection_layer(x)
+    
+def build_transformer(src_vocab_size: int, trg_vocab_size: int, src_seq_len:int, trg_seq_len: int, d_model: int = 512, d_ff: int = 2048, n_heads: int = 8, num_layers: int = 6, dropout: float = 0.1):
+    # Build the transformer model
+    src_embedding = InputEmbedding(d_model, src_vocab_size)
+    trg_embedding = InputEmbedding(d_model, trg_vocab_size)
+    
+    src_positional_embedding = PositionalEmbedding(d_model, seq_len=src_seq_len, dropout=dropout) 
+    trg_positional_embedding = PositionalEmbedding(d_model, seq_len=trg_seq_len, dropout=dropout)
+
+    # Encoder and decoder blocks
+    encoder_blocks = []
+    for _ in range(num_layers):
+        encoder_self_attention = MultiHeadAttention(d_model, n_heads, dropout)
+        encoder_feed_forward = FeedForward(d_model, d_ff, dropout=dropout)
+        encoder_blocks.append(EncoderBlock(encoder_self_attention, encoder_feed_forward, dropout))
+
+    #decoder blocks
+    decoder_blocks = []
+    for _ in range(num_layers):
+        decoder_self_attention = MultiHeadAttention(d_model, n_heads, dropout)
+        decoder_cross_attention = MultiHeadAttention(d_model, n_heads, dropout)
+        decoder_feed_forward = FeedForward(d_model, d_ff, dropout=dropout)
+        decoder_blocks.append(DecoderBlock(decoder_self_attention, decoder_cross_attention, decoder_feed_forward, dropout))
+
+    # create encoder and decoder
+    encoder = Encoder(nn.ModuleList(encoder_blocks))
+    decoder = Decoder(nn.ModuleList(decoder_blocks))
+    # create projection layer
+    projection_layer = ProjectionLayer(d_model, trg_vocab_size)
+
+    # create transformer model
+    transformer = Transformer(src_embedding, trg_embedding, src_positional_embedding, trg_positional_embedding, encoder, decoder, projection_layer)
+
+    # Initialize the parameters
+    for p in transformer.parameters():
+        if p.dim() > 1:
+            nn.init.xavier_uniform_(p)  # Xavier initialization for weights
+        else:
+            nn.init.constant_(p, 0)  # Zero initialization for biases
+    return transformer
+
+
+
+
+
+
+
+
+# Example usage
+if __name__ == "__main__":
+    src_vocab_size = 10000
+    trg_vocab_size = 10000
+    src_seq_len = 50
+    trg_seq_len = 50
+    d_model = 512
+    d_ff = 2048
+    n_heads = 8
+    num_layers = 6
+    dropout = 0.1
+
+    transformer_model = build_transformer(src_vocab_size, trg_vocab_size, src_seq_len, trg_seq_len, d_model, d_ff, n_heads, num_layers, dropout)
+    print(transformer_model)
+
