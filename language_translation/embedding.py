@@ -101,8 +101,8 @@ class MultiHeadAttention(nn.Module):
     def __init__(self,d_model: int, n_heads:int = 8, dropout: float= 0.1):
         super().__init__()
         self.d_model = d_model
-        self.n_heads = n_heads
-        self.head_dim = d_model // n_heads #dk # Dimension of each head
+        self.n_heads = n_heads #h
+        self.head_dim = d_model // n_heads #d_k Dimension of each head
 
         assert self.head_dim * n_heads == d_model, "d_model must be divisible by n_heads"
 
@@ -110,16 +110,16 @@ class MultiHeadAttention(nn.Module):
         self.query = nn.Linear(d_model, d_model)
         self.key = nn.Linear(d_model, d_model)
         self.value = nn.Linear(d_model, d_model)
-
+        self.out  = nn.Linear(d_model, d_model) # w_o
         self.dropout = nn.Dropout(dropout)
-        self.out  = nn.Linear(d_model, d_model)
+
 
     @staticmethod
     def attention(query, key, value, dropout=None, mask=None):
         head_dim = query.shape[-1]  # d_k
         # Calculate attention scores
         # (batch_size, n_heads, seq_len, head_dim) @ (batch_size, n_heads, head_dim, seq_len) --> (batch_size, n_heads, seq_len, seq_len)
-        attention_scores  =  query @ key.transpose(-2, -1) / math.sqrt(head_dim)  # Scaled dot-product attention
+        attention_scores  =  (query @ key.transpose(-2, -1)) / math.sqrt(head_dim)  # Scaled dot-product attention
         if mask is not None:
             attention_scores = attention_scores.masked_fill_(mask == 0, -1e9)  # Apply mask to attention scores
         # Apply softmax to get attention weights   
@@ -148,20 +148,18 @@ class MultiHeadAttention(nn.Module):
         value = self.value(value)
 
         #split into multiple heads
-        batch_size = query.shape[0]
-        seq_len = query.shape[1]
         # (batch_size, seq_len, d_model)--> (batch_size, seq_len, n_heads, head_dim) -->(batch_size, n_heads, seq_len, head_dim)
-        query =  query.view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1, 2) 
-        key   =  key.view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1,2)
-        value =  value.view(batch_size, seq_len, self.n_heads, self.head_dim).transpose(1,2)
+        query =  query.view(query.shape[0], query.shape[1], self.n_heads, self.head_dim).transpose(1, 2) 
+        key   =  key.view(key.shape[0], key.shape[1], self.n_heads, self.head_dim).transpose(1,2)
+        value =  value.view(value.shape[0], value.shape[1], self.n_heads, self.head_dim).transpose(1,2)
 
         # Calculate attention scores
         # (batch_size, n_heads, seq_len, head_dim) @ (batch_size, n_heads, head_dim, seq_len) --> (batch_size, n_heads, seq_len, seq_len)
-        attention_output, attention_scores = self.attention(query, key, value, self.dropout, mask)
+        attention_output, self.attention_scores = MultiHeadAttention.attention(query, key, value, self.dropout, mask)
         
         # Concatenate the heads
         # (batch_size, n_heads, seq_len, head_dim) --> (batch_size, seq_len, n_heads * head_dim) --> (batch_size, seq_len, d_model)
-        attention_output = attention_output.transpose(1, 2).contiguous().view(batch_size, seq_len, self.d_model)
+        attention_output = attention_output.transpose(1, 2).contiguous().view(attention_output.shape[0], -1, self.n_heads*self.head_dim)
         
         # Apply final linear layer
         # (batch_size, seq_len, d_model) --> (batch_size, seq_len, d_model)
