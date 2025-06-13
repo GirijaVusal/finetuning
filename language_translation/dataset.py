@@ -13,12 +13,12 @@ class BilingualDataset(Dataset):
         self.tgt_lang = tgt_lang
         self.seq_len = seq_len
 
-        self.sos_token = torch.tensor(tokenizer_src.token_to_id(["[SOS]"]),dtype=torch.int64)
-        self.eos_token = torch.tensor(tokenizer_src.token_to_id(["[EOS]"]),dtype=torch.int64)
-        self.pad_token = torch.tensor(tokenizer_src.token_to_id(["[PAD]"]),dtype=torch.int64)
+        self.sos_token = torch.tensor(tokenizer_src.token_to_id('<SOS>'),dtype=torch.int64)
+        self.eos_token = torch.tensor(tokenizer_src.token_to_id('<EOS>'),dtype=torch.int64)
+        self.pad_token = torch.tensor(tokenizer_src.token_to_id('<PAD>'),dtype=torch.int64)
 
-        self.unk_token = torch.tensor(tokenizer_src.token_to_id(["[UNK]"]),dtype=torch.int64)
-        self.mask_token = torch.tensor(tokenizer_src.token_to_id(["[MASK]"]),dtype=torch.int64)
+        self.unk_token = torch.tensor(tokenizer_src.token_to_id('<UNK>'),dtype=torch.int64)
+        self.mask_token = torch.tensor(tokenizer_src.token_to_id('<MASK>'),dtype=torch.int64)
 
 
     def __len__(self):
@@ -40,29 +40,32 @@ class BilingualDataset(Dataset):
         
         encoder_input = torch.cat(
             [
-                self.sos_token, 
+                self.sos_token.unsqueeze(0),
                 torch.tensor(enc_input_tokens, dtype=torch.int64), 
-                self.eos_token, 
+                self.eos_token.unsqueeze(0),
                 # self.pad_token.repeat(enc_num_padding_tokens)
                 torch.tensor([self.pad_token]* enc_num_padding_tokens, dtype=torch.int64)
-            ]
+            ],
+            dim=0
         )
 
         decoder_input = torch.cat(
             [
-                self.sos_token, 
+                self.sos_token.unsqueeze(0),
                 torch.tensor(dec_input_tokens, dtype=torch.int64), 
                 torch.tensor([self.pad_token]* dec_num_padding_tokens, dtype=torch.int64)
-            ]
+            ],
+            dim=0
         )
 
         #target output is decoder input shifted by one token
         label = torch.cat(
             [
                 torch.tensor(dec_input_tokens, dtype=torch.int64), 
-                self.eos_token, 
+                self.eos_token.unsqueeze(0),
                 torch.tensor([self.pad_token]* dec_num_padding_tokens, dtype=torch.int64)
-            ]
+            ],
+            dim=0
         )
 
         assert len(encoder_input) == self.seq_len, f"Encoder input length {len(encoder_input)} does not match seq_len {self.seq_len}"
@@ -73,7 +76,7 @@ class BilingualDataset(Dataset):
             'encoder_input': encoder_input,
             'decoder_input': decoder_input,
             'encoder_mask': (encoder_input != self.pad_token).unsqueeze(0).unsqueeze(0).int(),  # Shape: (1, 1, seq_len)
-            'decoder_mask': (decoder_input != self.pad_token).unsqueeze(0).unsqueeze(0).int() & causal_mask(decoder_input.size[0]), # Shape: (1, seq_len) & (1,seq_len, seq_len)
+            'decoder_mask': (decoder_input != self.pad_token).unsqueeze(0).int() & causal_mask(decoder_input.size(0)), # Shape: (1, seq_len) & (1,seq_len, seq_len)
             'label': label,
             'src_text': src_text,
             'tgt_text': tgt_text
