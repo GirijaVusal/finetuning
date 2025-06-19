@@ -9,10 +9,10 @@ from tokenizers.trainers import WordLevelTrainer
 from tokenizers.pre_tokenizers import Whitespace
 from tqdm import tqdm
 from pathlib import Path 
-from dataset import BilingualDataset,causal_mask
-from embedding import build_transformer
+from .dataset import BilingualDataset,causal_mask
+from .embedding import build_transformer
 
-from config import get_weights_file_path,get_config
+from .config import get_weights_file_path,get_config
 
 
 def greedy_decode(model, src_input, src_mask, tokenizer_src, tokenizer_tgt, max_len, device):
@@ -110,6 +110,8 @@ def get_all_sentences(ds, lang):
     """
     for item in ds:
         yield item['translation'][lang]
+    # for item in ds:
+    #     yield item['translation'][lang]
 
 def get_or_build_tokenizer(config, ds, lang):
     tokenizer_path =  Path(config['tokenizer_path'].format(lang))
@@ -119,7 +121,7 @@ def get_or_build_tokenizer(config, ds, lang):
         tokenizer.pre_tokenizer = Whitespace()
         # trainer = WordLevelTrainer(vocab_size=config['vocab_size'], special_tokens=["[UNK]", "[PAD]", "[CLS]", "[SEP]", "[MASK]"],min_frequency=2)
         # tokenizer.train_from_iterator(ds[lang]['train']['text'], trainer=trainer)
-        trainer = WordLevelTrainer(    special_tokens=['<UNK>', '<PAD>', '<CLS>', '<SEP>', '<MASK>', '<SOS>', '<EOS>'],min_frequency=2)
+        trainer = WordLevelTrainer(special_tokens=['<UNK>', '<PAD>', '<CLS>', '<SEP>', '<MASK>', '<SOS>', '<EOS>'],min_frequency=2)
         tokenizer.train_from_iterator(get_all_sentences(ds, lang), trainer=trainer)
         tokenizer.save(str(tokenizer_path))
     else:
@@ -132,8 +134,10 @@ def get_ds(config):
     Loads the dataset and returns it.
     """
     # ds = load_dataset(config['dataset_name'], config['dataset_config'],split="train")
-    ds = load_dataset(config['dataset_name'], f"{config['source_lang']}-{config['target_lang']}", split="train")
-
+    # ds = load_dataset(config['dataset_name'], f"{config['source_lang']}-{config['target_lang']}", split="train")
+    from dataset_builder.hf_ds import load_nep_eng_ds
+    ds = load_nep_eng_ds()
+    ds = ds['train']
 
     tokenizer_src = get_or_build_tokenizer(config, ds, config['source_lang'])
     tokenizer_tgt = get_or_build_tokenizer(config, ds, config['target_lang'])

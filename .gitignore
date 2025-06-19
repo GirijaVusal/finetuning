@@ -5,6 +5,10 @@ __pycache__/
 
 # C extensions
 *.so
+runs/
+weights/
+tokenizer_*
+/tokenizer_*
 
 # Distribution / packaging
 .Python
