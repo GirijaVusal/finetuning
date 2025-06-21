@@ -3,7 +3,7 @@ from pathlib import Path
 def get_config():
     # seq_len need to check on dataset
     config = {
-        "batch_size": 2,
+        "batch_size": 4,
         "num_workers": 2,
         "lr": 1e-4,
         "seq_len": 350,

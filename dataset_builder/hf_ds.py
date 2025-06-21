@@ -12,42 +12,48 @@ def make_dual_nepali_to_eng_dataset(data):
     """
     rows = []
     for ex in data:
-        eng = ex["eng"]
+        # print(ex)
+        eng = ex["english"]
         nep_devanagari = ex["nepali"]
-        nep_romanized = ex["romanized_nep"]
-
-        # rows.append({
-        #     "id": str(uuid4()),
-        #     "translation": {
-        #         "nep": nep_devanagari,
-        #         "eng": eng
-        #     }
-        # })
+        nep_romanized = ex["romanized"]
 
         rows.append({
             "id": str(uuid4()),
             "translation": {
-                "nep": nep_romanized,
+                "nep": nep_devanagari,
                 "eng": eng
             }
         })
 
+        # rows.append({
+        #     "id": str(uuid4()),
+        #     "translation": {
+        #         "nep": nep_romanized,
+        #         "eng": eng
+        #     }
+        # })
+    
+
     ds = Dataset.from_list(rows)
     return DatasetDict({"train": ds})
 
+
 def load_nep_eng_ds():
-    from dataset_builder.data import data
-    return make_dual_nepali_to_eng_dataset(data)
+    from dataset_builder.data import datas
+    return make_dual_nepali_to_eng_dataset(datas)
 
 if __name__ == "__main__":
-    data = [
-        {
-            "nepali": "तिमी कस्तो छौ?",
-            "romanized_nep": "timi kasto chau?",
-            "eng": "How are you?"
-        }
-    ]
+    # data = [
+    #     {
+    #         "nepali": "तिमी कस्तो छौ?",
+    #         "romanized_nep": "timi kasto chau?",
+    #         "eng": "How are you?"
+    #     }
+    # ]
+    # dataset = make_dual_nepali_to_eng_dataset(data)
 
-    dataset = make_dual_nepali_to_eng_dataset(data)
-    for ex in dataset["train"]:
-        print(ex)
+
+ 
+    dataset = load_nep_eng_ds()
+
+   
